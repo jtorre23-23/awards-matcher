@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Awards Matcher — Alloy Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1a18;
+    --ink-2: #4a4a47;
+    --ink-3: #8a8a86;
+    --surface: #ffffff;
+    --surface-2: #f4f8f9;
+    --surface-3: #e6f2f3;
+    --border: #d0e4e6;
+    --teal: #008E98;
+    --teal-dark: #006d75;
+    --cyan: #00C9DC;
+    --accent: #008E98;
+    --accent-light: #e0f5f7;
+    --cta: #FF6D00;
+    --cta-dark: #e05f00;
+    --success: #1a6b3a;
+    --success-light: #e6f4ec;
+    --warning: #7a4f00;
+    --warning-light: #fef4e0;
+    --radius: 10px;
+    --font: "Open Sans", system-ui, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    font-size: 16px;
+    background: var(--surface-2);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--teal) 0%, var(--cyan) 100%);
+    min-height: 80px;
+    padding: 0 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .header-left { display: flex; flex-direction: column; justify-content: center; }
+
+  .header-logo {
+    display: block;
+    width: 180px;
+    height: auto;
+    filter: brightness(0) invert(1);
+  }
+
+  .header-tagline {
+    font-size: 1rem;
+    color: rgba(255,255,255,0.82);
+    font-weight: 400;
+    margin-top: 0.4rem;
+    letter-spacing: 0.01em;
+  }
+
+  .header-tool {
+    font-size: 1rem;
+    color: rgba(255,255,255,0.75);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .progress-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex;
+    gap: 0;
+  }
+
+  .progress-step {
+    padding: 0.85rem 0;
+    margin-right: 2rem;
+    font-size: 14px;
+    color: var(--ink-3);
+    border-bottom: 2px solid transparent;
+    cursor: default;
+  }
+
+  .progress-step.active {
+    color: var(--ink);
+    border-bottom-color: var(--teal);
+    font-weight: 600;
+  }
+
+  .progress-step.done {
+    color: var(--success);
+    border-bottom-color: var(--success);
+  }
+
+  main {
+    max-width: 720px;
+    margin: 2.5rem auto;
+    padding: 0 1.5rem 4rem;
+  }
+
+  .view { display: none; }
+  .view.active { display: block; }
+
+  .view-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.01em;
+  }
+
+  .view-sub {
+    font-size: 0.875rem;
+    color: var(--ink-2);
+    margin-bottom: 2rem;
+    line-height: 1.5;
+  }
+
+  .form-section {
+    margin-bottom: 2rem;
+  }
+
+  .form-section-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 0.75rem;
+    display: block;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .field-row.single { grid-template-columns: 1fr; }
+
+  input[type="text"], select, textarea {
+    width: 100%;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-family: var(--font);
+    color: var(--ink);
+    background: var(--surface);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  input[type="text"]:focus, select:focus, textarea:focus {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(0,142,152,0.1);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 90px;
+    line-height: 1.5;
+  }
+
+  .tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .tag {
+    padding: 0.4rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--ink-2);
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.12s;
+    user-select: none;
+    font-family: var(--font);
+  }
+
+  .tag:hover { border-color: var(--teal); color: var(--teal); }
+
+  .tag.on {
+    background: var(--accent-light);
+    border-color: var(--teal);
+    color: var(--teal);
+    font-weight: 600;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0.7rem 1.5rem;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-family: var(--font);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+  }
+
+  .btn-primary {
+    background: var(--cta);
+    color: white;
+    box-shadow: 0 2px 8px rgba(255,109,0,0.25);
+  }
+
+  .btn-primary:hover { background: var(--cta-dark); box-shadow: 0 3px 12px rgba(255,109,0,0.35); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+  .btn-ghost {
+    background: none;
+    color: var(--ink-2);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover { background: var(--surface-3); color: var(--ink); border-color: var(--teal); }
+
+  .error {
+    display: none;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: #b91c1c;
+    padding: 0.6rem 0.85rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius);
+  }
+
+  /* Results */
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+  }
+
+  .profile-pill {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 1.75rem;
+  }
+
+  .pill {
+    padding: 0.3rem 0.7rem;
+    background: var(--surface-3);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    color: var(--ink-2);
+  }
+
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 3rem 0;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--teal);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading p {
+    font-size: 0.875rem;
+    color: var(--ink-3);
+  }
+
+  .award-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.4rem;
+    margin-bottom: 1rem;
+    border-left: 3px solid var(--teal);
+  }
+
+  .award-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.3rem;
+  }
+
+  .award-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+
+  .badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    white-space: nowrap;
+    margin-left: 12px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .badge-high { background: var(--success-light); color: var(--success); }
+  .badge-med { background: var(--warning-light); color: var(--warning); }
+
+  .award-org {
+    font-size: 0.8rem;
+    color: var(--ink-3);
+    margin-bottom: 1rem;
+  }
+
+  .award-deadline {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 0.15rem 0.5rem;
+    background: var(--surface-2);
+    border-radius: 4px;
+    font-size: 0.72rem;
+    color: var(--ink-2);
+  }
+
+  .award-body {
+    border-top: 1px solid var(--surface-3);
+    padding-top: 0.9rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .award-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--teal);
+    margin-bottom: 0.3rem;
+  }
+
+  .award-section-text {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.6;
+  }
+
+  .award-actions {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .nominate-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    color: var(--cta);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    font-family: var(--font);
+    font-weight: 600;
+  }
+
+  .nominate-btn:hover { text-decoration: underline; color: var(--cta-dark); }
+
+  .award-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    color: var(--teal);
+    font-weight: 600;
+    text-decoration: none;
+    font-family: var(--font);
+  }
+
+  .award-link:hover { text-decoration: underline; color: var(--teal-dark); }
+
+  @media (max-width: 600px) {
+    .field-row { grid-template-columns: 1fr; }
+    .award-body { grid-template-columns: 1fr; }
+    header { padding: 1.5rem 1.25rem; }
+    main { margin: 1.5rem auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <img src="/alloy-labs-logo.png" alt="Alloy Labs" class="header-logo" />
+    <div class="header-tagline">Banking, unbound.</div>
+  </div>
+  <div class="header-tool">Awards Matcher</div>
+</header>
+
+<nav class="progress-bar" aria-label="Progress">
+  <div class="progress-step active" id="ps1">Member profile</div>
+  <div class="progress-step" id="ps2">Matching awards</div>
+  <div class="progress-step" id="ps3">Nomination ready</div>
+</nav>
+
+<main>
+
+  <!-- FORM VIEW -->
+  <div class="view active" id="view-form">
+    <h2 class="view-title">Build a member profile</h2>
+    <p class="view-sub">Fill in what you know — the more detail on achievements, the sharper the award matches.</p>
+
+    <div class="form-section">
+      <span class="form-section-label">Basic info</span>
+      <div class="field-row">
+        <input type="text" id="f-name" placeholder="Full name" />
+        <input type="text" id="f-title" placeholder="Job title" />
+      </div>
+      <div class="field-row">
+        <input type="text" id="f-company" placeholder="Organization" />
+        <select id="f-industry">
+          <option value="">Industry</option>
+          <option>Banking & financial services</option>
+          <option>Community banking</option>
+          <option>Credit unions</option>
+          <option>Fintech</option>
+          <option>Healthcare</option>
+          <option>Technology</option>
+          <option>Nonprofits</option>
+          <option>Professional services</option>
+          <option>Education</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <select id="f-career">
+          <option value="">Career stage</option>
+          <option>Early career (0–5 yrs)</option>
+          <option>Mid-career (5–15 yrs)</option>
+          <option>Senior leader (15+ yrs)</option>
+          <option>Executive / C-suite</option>
+        </select>
+        <select id="f-geo">
+          <option value="">Geographic scope</option>
+          <option>Local / city</option>
+          <option>Regional / state</option>
+          <option>National</option>
+          <option>International</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <span class="form-section-label">Achievement themes</span>
+      <div class="tag-row" id="theme-tags">
+        <span class="tag" data-v="change management">Change management</span>
+        <span class="tag" data-v="digital transformation">Digital transformation</span>
+        <span class="tag" data-v="innovation">Innovation</span>
+        <span class="tag" data-v="leadership">Leadership</span>
+        <span class="tag" data-v="diversity & inclusion">Diversity & inclusion</span>
+        <span class="tag" data-v="community impact">Community impact</span>
+        <span class="tag" data-v="entrepreneurship">Entrepreneurship</span>
+        <span class="tag" data-v="sustainability">Sustainability</span>
+        <span class="tag" data-v="women in leadership">Women in leadership</span>
+        <span class="tag" data-v="emerging leader">Emerging leader</span>
+        <span class="tag" data-v="operational excellence">Operational excellence</span>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <span class="form-section-label">Key achievements</span>
+      <div class="field-row single">
+        <textarea id="f-achievements" placeholder="Describe 2–3 notable achievements or initiatives with measurable outcomes. E.g. Led a 3-bank merger integration, launched digital onboarding that cut time-to-open by 60%, built a $40M innovation fund from scratch."></textarea>
+      </div>
+    </div>
+
+    <div id="form-error" class="error"></div>
+    <button class="btn btn-primary" id="find-btn" onclick="submitProfile()">Find matching awards →</button>
+  </div>
+
+  <!-- RESULTS VIEW -->
+  <div class="view" id="view-results">
+    <div class="results-header">
+      <div>
+        <h2 class="view-title" id="results-title">Matching awards</h2>
+        <p class="view-sub" style="margin-bottom:0" id="results-sub"></p>
+      </div>
+      <button class="btn btn-ghost" onclick="reset()" style="margin-top:4px">← New profile</button>
+    </div>
+
+    <div class="profile-pill" id="profile-pills"></div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>Searching for awards…</p>
+    </div>
+
+    <div id="awards-list"></div>
+  </div>
+
+</main>
+
+<script>
+  const themes = new Set();
+
+  document.querySelectorAll('.tag').forEach(t => {
+    t.addEventListener('click', () => {
+      const v = t.dataset.v;
+      themes.has(v) ? (themes.delete(v), t.classList.remove('on')) : (themes.add(v), t.classList.add('on'));
+    });
+  });
+
+  function setStep(n) {
+    [1,2,3].forEach(i => {
+      const el = document.getElementById('ps' + i);
+      el.className = 'progress-step' + (i < n ? ' done' : i === n ? ' active' : '');
+    });
+  }
+
+  function showView(id) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function getProfile() {
+    return {
+      name: document.getElementById('f-name').value.trim(),
+      title: document.getElementById('f-title').value.trim(),
+      company: document.getElementById('f-company').value.trim(),
+      industry: document.getElementById('f-industry').value,
+      career: document.getElementById('f-career').value,
+      geo: document.getElementById('f-geo').value,
+      themes: [...themes],
+      achievements: document.getElementById('f-achievements').value.trim(),
+    };
+  }
+
+  async function submitProfile() {
+    const p = getProfile();
+    const errEl = document.getElementById('form-error');
+    errEl.style.display = 'none';
+
+    if (!p.name) return showErr('Please enter a member name.');
+    if (!p.industry) return showErr('Please select an industry.');
+    if (p.themes.length === 0) return showErr('Select at least one achievement theme.');
+    if (!p.achievements) return showErr('Please describe at least one key achievement.');
+
+    function showErr(msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
+
+    setStep(2);
+    showView('view-results');
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('awards-list').innerHTML = '';
+
+    const pills = [p.name, p.title, p.industry, p.career, p.geo].filter(Boolean);
+    document.getElementById('profile-pills').innerHTML = pills.map(x => `<span class="pill">${x}</span>`).join('') +
+      p.themes.map(t => `<span class="pill" style="background:var(--accent-light);color:var(--teal)">${t}</span>`).join('');
+    document.getElementById('results-title').textContent = `Awards for ${p.name}`;
+    document.getElementById('results-sub').textContent = 'Reviewing profile and searching for matches…';
+
+    try {
+      const res = await fetch('/api/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: p })
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      const text = data.content.find(b => b.type === 'text')?.text || '';
+      const clean = text.replace(/```json|```/g, '').trim();
+      const awards = JSON.parse(clean);
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('results-sub').textContent = `${awards.length} awards found — sorted by match strength`;
+      setStep(3);
+      renderAwards(awards, p);
+    } catch (e) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('awards-list').innerHTML =
+        `<div style="color:#b91c1c;font-size:.875rem;padding:1rem;background:#fef2f2;border-radius:var(--radius);border:1px solid #fecaca">
+          Could not load awards. Make sure your server is running with a valid ANTHROPIC_API_KEY. (${e.message})
+        </div>`;
+    }
+  }
+
+  function renderAwards(awards, p) {
+    const sorted = [...awards].sort((a,b) => a.match === 'High' && b.match !== 'High' ? -1 : 1);
+    document.getElementById('awards-list').innerHTML = sorted.map(a => `
+      <div class="award-card">
+        <div class="award-top">
+          <span class="award-name">${a.award_name}</span>
+          <span class="badge ${a.match === 'High' ? 'badge-high' : 'badge-med'}">${a.match} match</span>
+        </div>
+        <div class="award-org">
+          ${a.org}
+          <span class="award-deadline">📅 ${a.deadline_season}</span>
+        </div>
+        <div class="award-body">
+          <div>
+            <div class="award-section-label">Why they fit</div>
+            <div class="award-section-text">${a.fit_reason}</div>
+          </div>
+          <div>
+            <div class="award-section-label">Nomination angle</div>
+            <div class="award-section-text">${a.nomination_angle}</div>
+          </div>
+        </div>
+        <div class="award-actions">
+          <button class="nominate-btn" onclick="draftNomination(${JSON.stringify(a).replace(/"/g, '&quot;')}, ${JSON.stringify(p).replace(/"/g, '&quot;')})">
+            Draft nomination →
+          </button>
+          ${a.website_url ? `<a class="award-link" href="${a.website_url}" target="_blank" rel="noopener noreferrer">Visit award page →</a>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function draftNomination(award, profile) {
+    const q = encodeURIComponent(`Draft a nomination for ${profile.name} for the "${award.award_name}" award by ${award.org}. Their key achievements: ${profile.achievements}. Nomination angle: ${award.nomination_angle}`);
+    window.open(`https://claude.ai/new?q=${q}`, '_blank');
+  }
+
+  function reset() {
+    setStep(1);
+    showView('view-form');
+    themes.clear();
+    document.querySelectorAll('.tag').forEach(t => t.classList.remove('on'));
+    document.getElementById('form-error').style.display = 'none';
+  }
+</script>
+</body>
+</html>

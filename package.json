@@ -1,0 +1,13 @@
+{
+  "name": "awards-matcher",
+  "version": "1.0.0",
+  "description": "AI-powered awards matching tool for member profiles",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "ANTHROPIC_API_KEY=your_key_here node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
