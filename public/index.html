@@ -932,9 +932,8 @@
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      const text = data.content.find(b => b.type === 'text')?.text || '';
-      const clean = text.replace(/```json|```/g, '').trim();
-      const awards = JSON.parse(clean);
+      const awards = data.awards;
+      if (!Array.isArray(awards)) throw new Error('Unexpected response format');
 
       document.getElementById('loading').style.display = 'none';
       document.getElementById('results-sub').textContent = `${awards.length} awards found — sorted by deadline`;

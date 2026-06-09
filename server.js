@@ -405,41 +405,27 @@ nomination_url: the direct nomination/submission page URL found via web search â
 
         const fullPrompt = prompt + sharedInstructions;
 
-        const payload = JSON.stringify({
+        const apiResp = await callClaudeAPI({
           model: "claude-sonnet-4-20250514",
           max_tokens: 5000,
           tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: [{ role: "user", content: fullPrompt }],
         });
 
-        const options = {
-          hostname: "api.anthropic.com",
-          path: "/v1/messages",
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": API_KEY,
-            "anthropic-version": "2023-06-01",
-            "Content-Length": Buffer.byteLength(payload),
-          },
-        };
+        if (apiResp.error) throw new Error(apiResp.error.message || "API error");
 
-        const apiReq = https.request(options, (apiRes) => {
-          let data = "";
-          apiRes.on("data", (chunk) => (data += chunk));
-          apiRes.on("end", () => {
-            res.writeHead(apiRes.statusCode, { "Content-Type": "application/json" });
-            res.end(data);
-          });
-        });
+        const rawText = apiResp.content?.find((b) => b.type === "text")?.text || "[]";
+        const clean = rawText.replace(/```json|```/g, "").trim();
+        let awards = [];
+        try {
+          awards = JSON.parse(clean);
+        } catch {
+          const m = clean.match(/\[[\s\S]*\]/);
+          if (m) { try { awards = JSON.parse(m[0]); } catch {} }
+        }
 
-        apiReq.on("error", (e) => {
-          res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: e.message }));
-        });
-
-        apiReq.write(payload);
-        apiReq.end();
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ awards: Array.isArray(awards) ? awards : [] }));
       } catch (e) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ error: "Invalid request body." }));
