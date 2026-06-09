@@ -133,20 +133,26 @@ If location is provided, include relevant local and regional awards alongside na
 
         const sharedInstructions = `
 
+For each award you identify, use web search to:
+1. Find the specific current nomination or submission URL — the exact "nominate", "apply", or "submit" page, not the award homepage. Search for "[award name] nominations [current year]" or "[award name] apply now".
+2. Find the confirmed deadline date for the current or next nomination cycle. Search for "[award name] deadline [current year]".
+
+Only include an award in your response if you can find a confirmed, active nomination page. Do not include awards where nominations appear closed, the award has been discontinued, or you cannot find an active submission page.
+
 Return ONLY a valid JSON array. No preamble, no markdown fences. Each object must have exactly these keys:
 award_name, org, match, fit_reason, nomination_angle, deadline_season, deadline_date, website_url, nomination_url
 
-deadline_date: specific date in MM/DD/YYYY format (use the next upcoming cycle based on today being June 2026), or exactly "Rolling" if no fixed deadline.
-
-website_url: the award's official information page URL. Never return null — if uncertain of the exact award page, use the sponsoring organization's main website. If that is also uncertain, return a Google search URL in the format https://www.google.com/search?q=Award+Name+nomination.
-nomination_url: the direct nomination/registration submission page URL, or null if uncertain.`;
+deadline_date: the confirmed deadline date found via web search in MM/DD/YYYY format, or "Rolling" if truly rolling, or "Check website" if you could not find a confirmed date.
+website_url: the award's official information page URL found via web search. Never return null.
+nomination_url: the direct nomination/submission page URL found via web search — the specific page where someone submits, not the homepage. Return null only if you searched and could not find a direct submission page.`;
 
         const fullPrompt = prompt + sharedInstructions;
 
         const https = require("https");
         const payload = JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1500,
+          max_tokens: 5000,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
           messages: [{ role: "user", content: fullPrompt }],
         });
 
