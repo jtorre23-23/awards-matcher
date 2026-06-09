@@ -7,6 +7,16 @@ const API_KEY = process.env.ANTHROPIC_API_KEY;
 const PORT = process.env.PORT || 3000;
 const PROFILES_PATH = path.join(__dirname, "profiles.json");
 
+// Microsoft Graph — member search
+const MS_TENANT_ID = process.env.MICROSOFT_TENANT_ID;
+const MS_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID;
+const MS_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET;
+const SP_DRIVE_ID = "b!eXXUArkJbE6IRqy6Sj0P3JoM1wQqV-xJg-jhyrNpqusQJgvWP_m7RoUnAZPr3h3N";
+const SP_ITEM_ID  = "01GEYK6V6RWAX7TGUHFRCIDTDG5FLAOWKE";
+
+let msTokenCache   = { token: null, expires: 0 };
+let membersCache   = { data: null, expires: 0 };
+
 const MIME = {
   ".html": "text/html",
   ".css": "text/css",
@@ -21,6 +31,94 @@ function readProfiles() {
 
 function writeProfiles(profiles) {
   fs.writeFileSync(PROFILES_PATH, JSON.stringify(profiles, null, 2));
+}
+
+// Generic HTTPS helper — returns parsed JSON
+function callHTTPS(options, body) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (r) => {
+      let data = "";
+      r.on("data", (c) => (data += c));
+      r.on("end", () => {
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error(`Non-JSON response (${r.statusCode}): ${data.slice(0, 200)}`)); }
+      });
+    });
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+async function getMicrosoftToken() {
+  if (msTokenCache.token && Date.now() < msTokenCache.expires) return msTokenCache.token;
+  if (!MS_TENANT_ID || !MS_CLIENT_ID || !MS_CLIENT_SECRET)
+    throw new Error("Microsoft credentials not configured (MICROSOFT_TENANT_ID / CLIENT_ID / CLIENT_SECRET).");
+
+  const body = `grant_type=client_credentials&client_id=${encodeURIComponent(MS_CLIENT_ID)}&client_secret=${encodeURIComponent(MS_CLIENT_SECRET)}&scope=https%3A%2F%2Fgraph.microsoft.com%2F.default`;
+  const data = await callHTTPS(
+    {
+      hostname: "login.microsoftonline.com",
+      path: `/${MS_TENANT_ID}/oauth2/v2.0/token`,
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Content-Length": Buffer.byteLength(body) },
+    },
+    body
+  );
+  if (!data.access_token) throw new Error(data.error_description || "Failed to get Microsoft token.");
+  msTokenCache = { token: data.access_token, expires: Date.now() + (data.expires_in - 60) * 1000 };
+  return msTokenCache.token;
+}
+
+async function getAllMembers() {
+  if (membersCache.data && Date.now() < membersCache.expires) return membersCache.data;
+
+  const token = await getMicrosoftToken();
+  const auth = { Authorization: `Bearer ${token}`, Accept: "application/json" };
+
+  // Get worksheets and take the first one
+  const sheets = await callHTTPS({ hostname: "graph.microsoft.com", path: `/v1.0/drives/${SP_DRIVE_ID}/items/${SP_ITEM_ID}/workbook/worksheets`, headers: auth });
+  if (!sheets.value?.length) throw new Error("No worksheets found in workbook.");
+  const sheetId = encodeURIComponent(sheets.value[0].id);
+
+  // Read used range (all data)
+  const range = await callHTTPS({ hostname: "graph.microsoft.com", path: `/v1.0/drives/${SP_DRIVE_ID}/items/${SP_ITEM_ID}/workbook/worksheets/${sheetId}/usedRange`, headers: auth });
+  const rows = range.values;
+  if (!rows?.length) return [];
+
+  // Map headers
+  const hdrs = rows[0].map((h) => String(h || "").toLowerCase().trim());
+  const col = {
+    email:     hdrs.indexOf("contact email"),
+    firstName: hdrs.indexOf("first name"),
+    lastName:  hdrs.indexOf("last name"),
+    title:     hdrs.indexOf("title"),
+    account:   hdrs.indexOf("account name"),
+  };
+
+  const members = rows.slice(1)
+    .filter((r) => r[col.firstName] || r[col.lastName] || r[col.account])
+    .map((r) => ({
+      email:     col.email     >= 0 ? String(r[col.email]     || "") : "",
+      firstName: col.firstName >= 0 ? String(r[col.firstName] || "") : "",
+      lastName:  col.lastName  >= 0 ? String(r[col.lastName]  || "") : "",
+      title:     col.title     >= 0 ? String(r[col.title]     || "") : "",
+      account:   col.account   >= 0 ? String(r[col.account]   || "") : "",
+    }));
+
+  membersCache = { data: members, expires: Date.now() + 5 * 60 * 1000 };
+  return members;
+}
+
+async function searchMembers(q) {
+  const lower = q.toLowerCase();
+  const all = await getAllMembers();
+  return all
+    .filter((m) => {
+      const name = `${m.firstName} ${m.lastName}`.toLowerCase();
+      return name.includes(lower) || m.account.toLowerCase().includes(lower);
+    })
+    .slice(0, 8);
 }
 
 // Generic Claude API caller — returns parsed response object
@@ -134,6 +232,25 @@ const server = http.createServer(async (req, res) => {
     writeProfiles(readProfiles().filter((p) => p.id !== id));
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  // GET /api/members?q=
+  if (req.method === "GET" && req.url.startsWith("/api/members")) {
+    const q = (new URL(req.url, "http://localhost").searchParams.get("q") || "").trim();
+    if (!q) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end("[]");
+      return;
+    }
+    try {
+      const members = await searchMembers(q);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(members));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: e.message }));
+    }
     return;
   }
 

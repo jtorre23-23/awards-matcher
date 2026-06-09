@@ -511,6 +511,64 @@
   }
   .saved-delete-btn:hover { color: #b91c1c; }
 
+  /* Member search dropdown */
+  .member-search-wrap {
+    position: relative;
+    margin-bottom: 0.75rem;
+  }
+
+  .member-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% - 1px);
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--teal);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    box-shadow: 0 6px 20px rgba(0,142,152,0.12);
+    z-index: 200;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  .member-dropdown.open { display: block; }
+
+  .member-result {
+    padding: 0.7rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+
+  .member-result:last-child { border-bottom: none; }
+  .member-result:hover { background: var(--accent-light); }
+
+  .member-result-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .member-result-meta {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin-top: 0.1rem;
+  }
+
+  .member-dropdown-msg {
+    padding: 0.75rem 1rem;
+    font-size: 14px;
+    color: var(--ink-3);
+  }
+
+  #member-search:focus {
+    border-color: var(--teal);
+    border-radius: var(--radius) var(--radius) 0 0;
+    box-shadow: 0 0 0 3px rgba(0,142,152,0.1);
+  }
+
   /* Scan transcript — member accordion */
   .member-section {
     background: var(--surface);
@@ -621,6 +679,10 @@
     <!-- Bank Member -->
     <div class="tab-panel active" id="panel-bank">
       <div class="form-section">
+        <div class="field-row single member-search-wrap">
+          <input type="text" id="member-search" placeholder="Search members — type a name or bank to autofill…" autocomplete="off" />
+          <div class="member-dropdown" id="member-dropdown"></div>
+        </div>
         <div class="field-row">
           <input type="text" id="b-name" placeholder="Member name" />
           <input type="text" id="b-title" placeholder="Job title" />
@@ -733,6 +795,69 @@
       document.getElementById('main-form-actions').style.display = activeTab === 'scan' ? 'none' : '';
     });
   });
+
+  // --- Member search autocomplete ---
+  let memberSearchTimer = null;
+
+  document.getElementById('member-search').addEventListener('input', function () {
+    clearTimeout(memberSearchTimer);
+    const q = this.value.trim();
+    if (!q) { closeMemberDropdown(); return; }
+    memberSearchTimer = setTimeout(() => fetchMembers(q), 300);
+  });
+
+  document.getElementById('member-search').addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeMemberDropdown(); this.blur(); }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.member-search-wrap')) closeMemberDropdown();
+  });
+
+  async function fetchMembers(q) {
+    const dd = document.getElementById('member-dropdown');
+    dd.innerHTML = '<div class="member-dropdown-msg">Searching…</div>';
+    dd.classList.add('open');
+    try {
+      const res = await fetch('/api/members?q=' + encodeURIComponent(q));
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      renderMemberDropdown(data, q);
+    } catch (e) {
+      dd.innerHTML = `<div class="member-dropdown-msg">Search unavailable. (${e.message})</div>`;
+    }
+  }
+
+  function renderMemberDropdown(members, q) {
+    const dd = document.getElementById('member-dropdown');
+    if (!members.length) {
+      dd.innerHTML = '<div class="member-dropdown-msg">No members found.</div>';
+      return;
+    }
+    dd.innerHTML = members.map(m => {
+      const fullName = [m.firstName, m.lastName].filter(Boolean).join(' ');
+      const meta = [m.title, m.account].filter(Boolean).join(' · ');
+      return `<div class="member-result" onclick="selectMember(${JSON.stringify(m).replace(/"/g, '&quot;')})">
+        <div class="member-result-name">${fullName}</div>
+        <div class="member-result-meta">${meta}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function selectMember(m) {
+    document.getElementById('b-name').value = [m.firstName, m.lastName].filter(Boolean).join(' ');
+    document.getElementById('b-title').value = m.title || '';
+    document.getElementById('b-bank').value = m.account || '';
+    document.getElementById('member-search').value = '';
+    closeMemberDropdown();
+    document.getElementById('b-achievements').focus();
+  }
+
+  function closeMemberDropdown() {
+    const dd = document.getElementById('member-dropdown');
+    dd.classList.remove('open');
+    dd.innerHTML = '';
+  }
 
   function setStep(n) {
     [1,2,3].forEach(i => {
