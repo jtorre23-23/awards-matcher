@@ -405,6 +405,19 @@
 
   .award-link:hover { text-decoration: underline; color: var(--teal-dark); }
 
+  .nominate-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    color: var(--cta);
+    font-weight: 600;
+    text-decoration: none;
+    font-family: var(--font);
+  }
+
+  .nominate-link:hover { text-decoration: underline; color: var(--cta-dark); }
+
   @media (max-width: 600px) {
     .field-row { grid-template-columns: 1fr; }
     .award-body { grid-template-columns: 1fr; }
@@ -634,6 +647,7 @@
           </div>
         </div>
         <div class="award-actions">
+          ${a.nomination_url ? `<a class="nominate-link" href="${a.nomination_url}" target="_blank" rel="noopener noreferrer">Register / Nominate →</a>` : ''}
           <button class="nominate-btn" onclick="draftNomination(${JSON.stringify(a).replace(/"/g, '&quot;')}, ${JSON.stringify(p).replace(/"/g, '&quot;')})">
             Draft nomination →
           </button>

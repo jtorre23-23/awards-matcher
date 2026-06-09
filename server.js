@@ -41,11 +41,12 @@ const server = http.createServer(async (req, res) => {
 
 Given this member profile, identify 5–6 specific, real awards they should apply for. For each award include:
 - Award name
-- Sponsoring organization  
+- Sponsoring organization
 - Match strength: High or Medium
 - Why they're a strong fit (2–3 sentences, specific to their profile)
 - Recommended nomination angle (1–2 sentences on how to frame the story)
 - Typical deadline season (e.g. Q1, Q3, or "rolling")
+- The direct nomination or registration URL — the specific page where someone submits a nomination or registers, not the award's general homepage. For example: a nominations form page, an awards entry portal, or a "nominate someone" landing page. Only include a URL you are confident is real and correct. If you cannot identify the exact nomination page URL with confidence, return null for this field.
 
 Member profile:
 - Name: ${profile.name}
@@ -58,9 +59,10 @@ Member profile:
 - Key achievements: ${profile.achievements}
 
 Return ONLY a valid JSON array. No preamble, no markdown fences. Each object must have exactly these keys:
-award_name, org, match, fit_reason, nomination_angle, deadline_season, website_url
+award_name, org, match, fit_reason, nomination_angle, deadline_season, website_url, nomination_url
 
-For website_url provide the official award or nomination page URL. If you are not certain of the exact URL, provide the sponsoring organization's homepage instead of guessing.`;
+website_url: the award's official information page URL, or null if uncertain.
+nomination_url: the direct nomination/registration submission page URL, or null if uncertain.`;
 
         const https = require("https");
         const payload = JSON.stringify({
