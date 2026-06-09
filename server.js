@@ -99,6 +99,7 @@ For each award include:
 - Why they're a strong fit (2–3 sentences, specific to their profile)
 - Recommended nomination angle (1–2 sentences on how to frame the story)
 - Typical deadline season (e.g. Q1, Q3, or "rolling")
+- Specific deadline date in MM/DD/YYYY format (e.g. 03/15/2027), or "Rolling" if there is no fixed annual deadline
 - The direct nomination or registration URL
 
 Member profile:
@@ -119,6 +120,7 @@ For each award include:
 - Why they're a strong fit (2–3 sentences, specific to their profile)
 - Recommended nomination angle (1–2 sentences on how to frame the story)
 - Typical deadline season (e.g. Q1, Q3, or "rolling")
+- Specific deadline date in MM/DD/YYYY format (e.g. 03/15/2027), or "Rolling" if there is no fixed annual deadline
 - The direct nomination or registration URL
 
 Company profile:
@@ -132,7 +134,9 @@ If location is provided, include relevant local and regional awards alongside na
         const sharedInstructions = `
 
 Return ONLY a valid JSON array. No preamble, no markdown fences. Each object must have exactly these keys:
-award_name, org, match, fit_reason, nomination_angle, deadline_season, website_url, nomination_url
+award_name, org, match, fit_reason, nomination_angle, deadline_season, deadline_date, website_url, nomination_url
+
+deadline_date: specific date in MM/DD/YYYY format (use the next upcoming cycle based on today being June 2026), or exactly "Rolling" if no fixed deadline.
 
 website_url: the award's official information page URL. Never return null — if uncertain of the exact award page, use the sponsoring organization's main website. If that is also uncertain, return a Google search URL in the format https://www.google.com/search?q=Award+Name+nomination.
 nomination_url: the direct nomination/registration submission page URL, or null if uncertain.`;

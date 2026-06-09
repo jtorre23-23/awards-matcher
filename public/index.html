@@ -335,14 +335,19 @@
   }
 
   .award-deadline {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     margin-left: 10px;
-    padding: 0.15rem 0.5rem;
-    background: var(--surface-2);
-    border-radius: 4px;
-    font-size: 0.72rem;
-    color: var(--ink-2);
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
   }
+
+  .deadline-soon  { background: #fff0e6; color: var(--cta); }
+  .deadline-later { background: var(--accent-light); color: var(--teal); }
+  .deadline-rolling { background: var(--surface-3); color: var(--ink-3); }
 
   .award-body {
     border-top: 1px solid var(--surface-3);
@@ -716,8 +721,26 @@
     }
   }
 
+  function deadlineSortKey(a) {
+    const d = a.deadline_date;
+    if (!d || d === 'Rolling') return Infinity;
+    const [m, dy, y] = d.split('/').map(Number);
+    return new Date(y, m - 1, dy).getTime();
+  }
+
+  function deadlineBadgeClass(d) {
+    if (!d || d === 'Rolling') return 'deadline-rolling';
+    const [m, dy, y] = d.split('/').map(Number);
+    const ms = new Date(y, m - 1, dy) - new Date();
+    return ms / 864e5 <= 60 ? 'deadline-soon' : 'deadline-later';
+  }
+
   function renderAwards(awards, p) {
-    const sorted = [...awards].sort((a,b) => a.match === 'High' && b.match !== 'High' ? -1 : 1);
+    const sorted = [...awards].sort((a, b) => {
+      const ka = deadlineSortKey(a), kb = deadlineSortKey(b);
+      if (ka !== kb) return ka - kb;
+      return (a.match === 'High') === (b.match === 'High') ? 0 : a.match === 'High' ? -1 : 1;
+    });
     document.getElementById('awards-list').innerHTML = sorted.map(a => `
       <div class="award-card">
         <div class="award-top">
@@ -726,7 +749,9 @@
         </div>
         <div class="award-org">
           ${a.org}
-          <span class="award-deadline">📅 ${a.deadline_season}</span>
+          <span class="award-deadline ${deadlineBadgeClass(a.deadline_date)}">
+            📅 ${a.deadline_date || a.deadline_season}
+          </span>
         </div>
         <div class="award-body">
           <div>
