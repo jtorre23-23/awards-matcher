@@ -851,7 +851,42 @@
   }
 
   function draftNomination(award, profile) {
-    const q = encodeURIComponent(`Draft a nomination for ${profile.name} for the "${award.award_name}" award by ${award.org}. Their key achievements: ${profile.achievements}. Nomination angle: ${award.nomination_angle}`);
+    const typeLabel = profile.type === 'bank' ? 'banking professional' : 'fintech leader';
+    const orgLabel  = profile.type === 'bank' ? 'bank' : 'company';
+    const location  = profile.state ? ` based in ${profile.state}` : '';
+
+    const q = encodeURIComponent(`Write a complete, professional nomination letter for the following award. The letter should be ready to submit with minimal editing — not an outline, not bullet points, but a polished, compelling letter.
+
+AWARD DETAILS
+Award: ${award.award_name}
+Presented by: ${award.org}
+What this award recognizes: ${award.fit_reason}
+Nomination angle to emphasize: ${award.nomination_angle}
+
+NOMINEE PROFILE
+Name: ${profile.name}
+Title: ${profile.title || 'Not specified'}
+${profile.type === 'bank' ? 'Bank' : 'Company'}: ${profile.company}${location}
+Background: ${typeLabel}
+Key achievements: ${profile.achievements}
+
+LETTER REQUIREMENTS
+Write a 400–600 word nomination letter structured as follows:
+
+1. Opening paragraph — a compelling hook that immediately establishes why ${profile.name} stands out among their peers and deserves this recognition. Do not start with "I am pleased to nominate." Be bold and specific.
+
+2. Achievement paragraph 1 — highlight the most significant accomplishment from their profile with specific, measurable impact. Quantify results wherever possible (dollars, percentages, number of people affected, timeframes).
+
+3. Achievement paragraph 2 — highlight a second major accomplishment that demonstrates a different dimension of their leadership or innovation. Again, be specific and quantify.
+
+4. Award alignment paragraph — directly connect ${profile.name}'s work to what the ${award.award_name} specifically looks for. Explain why their contribution to the ${orgLabel} and the broader ${profile.type === 'bank' ? 'banking' : 'fintech'} industry makes them the ideal recipient.
+
+5. Closing paragraph — a strong, confident statement making the case for why ${profile.name} should win. End with a clear, direct call to recognize them.
+
+Tone: authoritative, specific, and persuasive. Written as if by a peer or supervisor who knows the nominee's work well. Suitable for a prestigious national award. Do not use filler phrases like "passionate about" or "dedicated professional." Let the achievements speak.
+
+Output only the letter text — no preamble, no commentary, no subject line.`);
+
     window.open(`https://claude.ai/new?q=${q}`, '_blank');
   }
 
