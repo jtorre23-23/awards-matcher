@@ -1,10 +1,18 @@
 const http = require("http");
+const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const PORT = process.env.PORT || 3000;
 const PROFILES_PATH = path.join(__dirname, "profiles.json");
+
+const MIME = {
+  ".html": "text/html",
+  ".css": "text/css",
+  ".js": "application/javascript",
+  ".json": "application/json",
+};
 
 function readProfiles() {
   try { return JSON.parse(fs.readFileSync(PROFILES_PATH, "utf8")); }
@@ -15,12 +23,70 @@ function writeProfiles(profiles) {
   fs.writeFileSync(PROFILES_PATH, JSON.stringify(profiles, null, 2));
 }
 
-const MIME = {
-  ".html": "text/html",
-  ".css": "text/css",
-  ".js": "application/javascript",
-  ".json": "application/json",
-};
+// Generic Claude API caller — returns parsed response object
+function callClaudeAPI(payload) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const req = https.request(
+      {
+        hostname: "api.anthropic.com",
+        path: "/v1/messages",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Length": Buffer.byteLength(body),
+        },
+      },
+      (r) => {
+        let data = "";
+        r.on("data", (c) => (data += c));
+        r.on("end", () => {
+          try { resolve(JSON.parse(data)); }
+          catch { reject(new Error("Invalid API response")); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+// Award-matching prompt builder — used by /api/scan (no web search)
+function buildAwardPrompt(profile) {
+  const isBank = profile.type !== "fintech";
+  return isBank
+    ? `You are an expert at matching banking professionals to prestigious industry awards and recognition programs.
+
+Given this bank member profile, return only awards where there is a genuine, strong fit. Focus on nationally recognized, prestigious awards in banking leadership, community banking, and financial services. Quality over quantity — 3 great matches is better than 8 mediocre ones. Only include awards you are confident are real and currently active.
+
+Member profile:
+- Name: ${profile.name || "Not specified"}
+- Title: ${profile.title || "Not specified"}
+- Bank: ${profile.company || "Not specified"}
+${profile.state ? `- Location: ${profile.state}\n` : ""}- Key achievements: ${profile.achievements || "Not specified"}`
+    : `You are an expert at matching fintech companies and their leaders to prestigious startup, innovation, and technology awards.
+
+Given this fintech company profile, return only awards where there is a genuine, strong fit. Focus on nationally recognized, prestigious awards in fintech innovation, startup excellence, and technology leadership. Quality over quantity — 3 great matches is better than 8 mediocre ones. Only include awards you are confident are real and currently active.
+
+Company profile:
+- Founder / Executive: ${profile.name || "Not specified"}
+- Title: ${profile.title || "Not specified"}
+- Company: ${profile.company || "Not specified"}
+${profile.state ? `- Location: ${profile.state}\n` : ""}- Key achievements: ${profile.achievements || "Not specified"}`;
+}
+
+const SCAN_SHARED_INSTRUCTIONS = `
+
+Return ONLY a valid JSON array. No preamble, no markdown fences. Each object must have exactly these keys:
+award_name, org, match, fit_reason, nomination_angle, deadline_season, deadline_date, website_url, nomination_url
+
+match: "High" or "Medium"
+deadline_date: estimated MM/DD/YYYY for next cycle (assuming today is June 2026), "Rolling", or "Check website"
+website_url: award info page — never null; use org homepage or https://www.google.com/search?q=Award+Name+nomination as fallback
+nomination_url: direct nomination/submission page URL, or null if unknown`;
 
 const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -71,7 +137,81 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API proxy endpoint
+  // POST /api/scan
+  if (req.method === "POST" && req.url === "/api/scan") {
+    if (!API_KEY) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "ANTHROPIC_API_KEY not set on server." }));
+      return;
+    }
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", async () => {
+      try {
+        const { transcript } = JSON.parse(body);
+        if (!transcript?.trim()) throw new Error("No transcript provided.");
+
+        // Step 1: extract member profiles from transcript
+        const extractResp = await callClaudeAPI({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2000,
+          messages: [{
+            role: "user",
+            content: `Extract all banking professionals and fintech executives mentioned in the following transcript or meeting notes. Only extract people being discussed as members, clients, or prospects — not the interviewer or note-taker.
+
+For each person return a JSON object with these exact keys: name, title, company, state, type, achievements
+- type: "bank" if they work at a bank/credit union/financial institution, "fintech" if fintech/startup/tech, default "bank" if unclear
+- achievements: a string summarizing ALL accomplishments, projects, and notable work mentioned about this person
+- Use "" for any field not mentioned
+
+Return ONLY a valid JSON array. No preamble, no markdown fences.
+
+Transcript:
+${transcript.slice(0, 8000)}`,
+          }],
+        });
+
+        const extractText = extractResp.content?.find((b) => b.type === "text")?.text || "[]";
+        let profiles = [];
+        try { profiles = JSON.parse(extractText.replace(/```json|```/g, "").trim()); } catch { profiles = []; }
+        if (!Array.isArray(profiles)) profiles = [];
+        profiles = profiles.filter((p) => p.name || p.company).slice(0, 8);
+
+        if (!profiles.length) {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ members: [] }));
+          return;
+        }
+
+        // Step 2: award matching for each member (sequential, no web search for speed)
+        const members = [];
+        for (const profile of profiles) {
+          try {
+            const awardResp = await callClaudeAPI({
+              model: "claude-sonnet-4-20250514",
+              max_tokens: 3000,
+              messages: [{ role: "user", content: buildAwardPrompt(profile) + SCAN_SHARED_INSTRUCTIONS }],
+            });
+            const awardText = awardResp.content?.find((b) => b.type === "text")?.text || "[]";
+            let awards = [];
+            try { awards = JSON.parse(awardText.replace(/```json|```/g, "").trim()); } catch { awards = []; }
+            members.push({ profile, awards: Array.isArray(awards) ? awards : [] });
+          } catch {
+            members.push({ profile, awards: [] });
+          }
+        }
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ members }));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // POST /api/match (with web search)
   if (req.method === "POST" && req.url === "/api/match") {
     if (!API_KEY) {
       res.writeHead(500, { "Content-Type": "application/json" });
@@ -85,7 +225,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const { profile } = JSON.parse(body);
 
-        const isBank = profile.type === 'bank';
+        const isBank = profile.type === "bank";
 
         const prompt = isBank
           ? `You are an expert at matching banking professionals to prestigious industry awards and recognition programs.
@@ -106,7 +246,7 @@ Member profile:
 - Name: ${profile.name}
 - Title: ${profile.title}
 - Bank: ${profile.company}
-${profile.state ? `- Location: ${profile.state}\n` : ''}- Key achievements: ${profile.achievements}
+${profile.state ? `- Location: ${profile.state}\n` : ""}- Key achievements: ${profile.achievements}
 
 If location is provided, include relevant local and regional awards alongside national ones. If no location is provided, focus entirely on national and industry-wide awards.`
           : `You are an expert at matching fintech companies and their leaders to prestigious startup, innovation, and technology awards.
@@ -126,7 +266,7 @@ For each award include:
 Company profile:
 - Founder / Executive: ${profile.name}
 - Title: ${profile.title}
-- Company: ${profile.company}${profile.state ? `\n- Location: ${profile.state}` : ''}
+- Company: ${profile.company}${profile.state ? `\n- Location: ${profile.state}` : ""}
 - Key achievements: ${profile.achievements}
 
 If location is provided, include relevant local and regional awards alongside national ones. If no location is provided, focus entirely on national and industry-wide awards.`;
@@ -148,7 +288,6 @@ nomination_url: the direct nomination/submission page URL found via web search �
 
         const fullPrompt = prompt + sharedInstructions;
 
-        const https = require("https");
         const payload = JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 5000,

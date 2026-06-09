@@ -511,6 +511,76 @@
   }
   .saved-delete-btn:hover { color: #b91c1c; }
 
+  /* Scan transcript — member accordion */
+  .member-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--teal);
+    border-radius: var(--radius);
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+  }
+
+  .member-header {
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    user-select: none;
+    transition: background 0.12s;
+  }
+
+  .member-header:hover { background: var(--surface-2); }
+
+  .member-header-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .member-header-meta {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin-top: 0.2rem;
+  }
+
+  .member-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .member-award-count {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--teal);
+    background: var(--accent-light);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+  }
+
+  .member-toggle {
+    font-size: 15px;
+    color: var(--ink-3);
+    transition: transform 0.2s;
+    display: inline-block;
+  }
+
+  .member-toggle.open { transform: rotate(90deg); }
+
+  .member-awards {
+    display: none;
+    padding: 0.75rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .member-awards.open { display: block; }
+
+  .member-awards .award-card { margin-top: 0.75rem; }
+
   @media (max-width: 600px) {
     .field-row { grid-template-columns: 1fr; }
     .award-body { grid-template-columns: 1fr; }
@@ -545,6 +615,7 @@
     <div class="tab-bar">
       <button class="tab active" data-tab="bank">Bank Member</button>
       <button class="tab" data-tab="fintech">Fintech Company</button>
+      <button class="tab" data-tab="scan">Scan transcript</button>
     </div>
 
     <!-- Bank Member -->
@@ -581,8 +652,21 @@
       </div>
     </div>
 
-    <div id="form-error" class="error"></div>
-    <button class="btn btn-primary" id="find-btn" onclick="submitProfile()">Find Awards →</button>
+    <!-- Scan Transcript -->
+    <div class="tab-panel" id="panel-scan">
+      <div class="form-section">
+        <div class="field-row single">
+          <textarea id="scan-transcript" style="min-height:160px" placeholder="Paste your meeting transcript or account notes here — we'll automatically identify members and find award opportunities for each one"></textarea>
+        </div>
+      </div>
+      <div id="scan-error" class="error"></div>
+      <button class="btn btn-primary" onclick="scanTranscript()">Scan for opportunities →</button>
+    </div>
+
+    <div id="main-form-actions">
+      <div id="form-error" class="error"></div>
+      <button class="btn btn-primary" id="find-btn" onclick="submitProfile()">Find Awards →</button>
+    </div>
 
     <div class="saved-section" id="saved-section" style="display:none">
       <div class="saved-section-title">Saved profiles</div>
@@ -613,6 +697,24 @@
     <div id="awards-list"></div>
   </div>
 
+  <!-- SCAN RESULTS VIEW -->
+  <div class="view" id="view-scan">
+    <div class="results-header">
+      <div>
+        <h2 class="view-title" id="scan-title">Scan results</h2>
+        <p class="view-sub" style="margin-bottom:0" id="scan-sub"></p>
+      </div>
+      <button class="btn btn-ghost" onclick="resetToScan()" style="margin-top:4px">← New scan</button>
+    </div>
+
+    <div class="loading" id="scan-loading">
+      <div class="spinner"></div>
+      <p id="scan-loading-msg">Analyzing transcript…</p>
+    </div>
+
+    <div id="scan-members"></div>
+  </div>
+
 </main>
 
 <script>
@@ -627,6 +729,8 @@
       document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
       t.classList.add('active');
       document.getElementById('panel-' + activeTab).classList.add('active');
+      // show/hide the main form submit button when switching to/from scan tab
+      document.getElementById('main-form-actions').style.display = activeTab === 'scan' ? 'none' : '';
     });
   });
 
@@ -708,7 +812,7 @@
       const awards = JSON.parse(clean);
 
       document.getElementById('loading').style.display = 'none';
-      document.getElementById('results-sub').textContent = `${awards.length} awards found — sorted by match strength`;
+      document.getElementById('results-sub').textContent = `${awards.length} awards found — sorted by deadline`;
       setStep(3);
       renderAwards(awards, p);
       saveBtn.style.display = 'inline-flex';
@@ -735,13 +839,8 @@
     return ms / 864e5 <= 60 ? 'deadline-soon' : 'deadline-later';
   }
 
-  function renderAwards(awards, p) {
-    const sorted = [...awards].sort((a, b) => {
-      const ka = deadlineSortKey(a), kb = deadlineSortKey(b);
-      if (ka !== kb) return ka - kb;
-      return (a.match === 'High') === (b.match === 'High') ? 0 : a.match === 'High' ? -1 : 1;
-    });
-    document.getElementById('awards-list').innerHTML = sorted.map(a => `
+  function buildAwardCardHTML(a, p) {
+    return `
       <div class="award-card">
         <div class="award-top">
           <span class="award-name">${a.award_name}</span>
@@ -771,8 +870,125 @@
           ${a.website_url ? `<a class="award-link" href="${a.website_url}" target="_blank" rel="noopener noreferrer">Visit award page →</a>` : ''}
         </div>
       </div>
-    `).join('');
+    `;
   }
+
+  function renderAwards(awards, p) {
+    const sorted = [...awards].sort((a, b) => {
+      const ka = deadlineSortKey(a), kb = deadlineSortKey(b);
+      if (ka !== kb) return ka - kb;
+      return (a.match === 'High') === (b.match === 'High') ? 0 : a.match === 'High' ? -1 : 1;
+    });
+    document.getElementById('awards-list').innerHTML = sorted.map(a => buildAwardCardHTML(a, p)).join('');
+  }
+
+  // --- Scan transcript ---
+
+  async function scanTranscript() {
+    const text = document.getElementById('scan-transcript').value.trim();
+    const errEl = document.getElementById('scan-error');
+    errEl.style.display = 'none';
+
+    if (!text) {
+      errEl.textContent = 'Please paste a transcript or meeting notes first.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    showView('view-scan');
+    document.getElementById('scan-loading').style.display = 'block';
+    document.getElementById('scan-members').innerHTML = '';
+    document.getElementById('scan-title').textContent = 'Scanning transcript…';
+    document.getElementById('scan-sub').textContent = 'Identifying members and finding award opportunities for each one…';
+
+    try {
+      const res = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: text })
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      document.getElementById('scan-loading').style.display = 'none';
+
+      if (!data.members.length) {
+        document.getElementById('scan-title').textContent = 'No members found';
+        document.getElementById('scan-sub').textContent = 'No banking professionals or fintech executives were identified in the transcript.';
+        return;
+      }
+
+      const totalAwards = data.members.reduce((sum, m) => sum + (m.awards?.length || 0), 0);
+      document.getElementById('scan-title').textContent =
+        `${data.members.length} member${data.members.length !== 1 ? 's' : ''} found`;
+      document.getElementById('scan-sub').textContent =
+        `${totalAwards} award opportunit${totalAwards !== 1 ? 'ies' : 'y'} identified — click a member to expand`;
+
+      renderScanResults(data.members);
+    } catch (e) {
+      document.getElementById('scan-loading').style.display = 'none';
+      document.getElementById('scan-title').textContent = 'Scan failed';
+      document.getElementById('scan-sub').textContent = '';
+      document.getElementById('scan-members').innerHTML =
+        `<div style="color:#b91c1c;font-size:.875rem;padding:1rem;background:#fef2f2;border-radius:var(--radius);border:1px solid #fecaca">
+          Could not complete scan. (${e.message})
+        </div>`;
+    }
+  }
+
+  function renderScanResults(members) {
+    document.getElementById('scan-members').innerHTML = members.map((m, i) => {
+      const awards = m.awards || [];
+      const awardHTML = awards.length
+        ? awards.map(a => buildAwardCardHTML(a, m.profile)).join('')
+        : '<p style="color:var(--ink-3);font-size:14px;padding:1rem 0">No strong award matches found for this profile.</p>';
+
+      const countBadge = awards.length
+        ? `<span class="member-award-count">${awards.length} award${awards.length !== 1 ? 's' : ''}</span>`
+        : '';
+
+      const typeLabel = m.profile.type === 'fintech' ? 'Fintech' : 'Bank Member';
+      const meta = [m.profile.title, m.profile.company, typeLabel].filter(Boolean).join(' · ');
+
+      return `
+        <div class="member-section">
+          <div class="member-header" onclick="toggleMember(${i})">
+            <div>
+              <div class="member-header-name">${m.profile.name || m.profile.company || 'Unknown member'}</div>
+              <div class="member-header-meta">${meta}</div>
+            </div>
+            <div class="member-header-right">
+              ${countBadge}
+              <span class="member-toggle" id="toggle-${i}">▸</span>
+            </div>
+          </div>
+          <div class="member-awards" id="member-awards-${i}">
+            ${awardHTML}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function toggleMember(i) {
+    const panel = document.getElementById('member-awards-' + i);
+    const toggle = document.getElementById('toggle-' + i);
+    const isOpen = panel.classList.contains('open');
+    panel.classList.toggle('open', !isOpen);
+    toggle.classList.toggle('open', !isOpen);
+  }
+
+  function resetToScan() {
+    showView('view-form');
+    setStep(1);
+    activeTab = 'scan';
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'scan'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-scan'));
+    document.getElementById('main-form-actions').style.display = 'none';
+  }
+
+  // --- Profile save/load ---
 
   async function saveProfile() {
     const btn = document.getElementById('save-btn');
@@ -832,6 +1048,7 @@
     const p = savedProfilesMap[id];
     if (!p) return;
     activeTab = p.type;
+    document.getElementById('main-form-actions').style.display = '';
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === p.type));
     document.querySelectorAll('.tab-panel').forEach(el => el.classList.toggle('active', el.id === 'panel-' + p.type));
     if (p.type === 'bank') {
@@ -898,6 +1115,7 @@ Output only the letter text — no preamble, no commentary, no subject line.`);
       document.getElementById(id).value = '';
     });
     activeTab = 'bank';
+    document.getElementById('main-form-actions').style.display = '';
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'bank'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-bank'));
     document.getElementById('form-error').style.display = 'none';
