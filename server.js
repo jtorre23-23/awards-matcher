@@ -61,7 +61,7 @@ Member profile:
 Return ONLY a valid JSON array. No preamble, no markdown fences. Each object must have exactly these keys:
 award_name, org, match, fit_reason, nomination_angle, deadline_season, website_url, nomination_url
 
-website_url: the award's official information page URL, or null if uncertain.
+website_url: the award's official information page URL. Never return null — if you are not certain of the exact award page, use the sponsoring organization's main website. If that is also uncertain, return a Google search URL in the format https://www.google.com/search?q=Award+Name+nomination where the query is the award name plus "nomination".
 nomination_url: the direct nomination/registration submission page URL, or null if uncertain.`;
 
         const https = require("https");
