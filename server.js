@@ -105,10 +105,9 @@ Member profile:
 - Name: ${profile.name}
 - Title: ${profile.title}
 - Bank: ${profile.company}
-- Location: ${profile.state || 'not specified'}
-- Key achievements: ${profile.achievements}
+${profile.state ? `- Location: ${profile.state}\n` : ''}- Key achievements: ${profile.achievements}
 
-Use location to prioritize relevant local and regional awards when a specific city, state, or region is provided — but always include strong national awards regardless of location. If location is vague or not provided, focus on national awards.`
+If location is provided, include relevant local and regional awards alongside national ones. If no location is provided, focus entirely on national and industry-wide awards.`
           : `You are an expert at matching fintech companies and their leaders to startup, innovation, and technology awards.
 
 Given this fintech company profile, identify 5–6 specific, real awards they should apply for. Focus on startup awards, fintech innovation, technology leadership, entrepreneurship, and financial technology recognition programs. Infer achievement themes automatically from their accomplishments — do not ask for themes.
@@ -125,11 +124,10 @@ For each award include:
 Company profile:
 - Founder / Executive: ${profile.name}
 - Title: ${profile.title}
-- Company: ${profile.company}
-- Location: ${profile.state || 'not specified'}
+- Company: ${profile.company}${profile.state ? `\n- Location: ${profile.state}` : ''}
 - Key achievements: ${profile.achievements}
 
-Use location to prioritize relevant local and regional awards when a specific city, state, or region is provided — but always include strong national awards regardless of location. If location is vague or not provided, focus on national awards.`;
+If location is provided, include relevant local and regional awards alongside national ones. If no location is provided, focus entirely on national and industry-wide awards.`;
 
         const sharedInstructions = `
 
