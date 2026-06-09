@@ -4,6 +4,16 @@ const path = require("path");
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const PORT = process.env.PORT || 3000;
+const PROFILES_PATH = path.join(__dirname, "profiles.json");
+
+function readProfiles() {
+  try { return JSON.parse(fs.readFileSync(PROFILES_PATH, "utf8")); }
+  catch { return []; }
+}
+
+function writeProfiles(profiles) {
+  fs.writeFileSync(PROFILES_PATH, JSON.stringify(profiles, null, 2));
+}
 
 const MIME = {
   ".html": "text/html",
@@ -14,12 +24,50 @@ const MIME = {
 
 const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  // GET /api/profiles
+  if (req.method === "GET" && req.url === "/api/profiles") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(readProfiles()));
+    return;
+  }
+
+  // POST /api/profiles
+  if (req.method === "POST" && req.url === "/api/profiles") {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      try {
+        const profile = JSON.parse(body);
+        const profiles = readProfiles();
+        const saved = { ...profile, id: Date.now().toString(), savedAt: new Date().toISOString() };
+        profiles.push(saved);
+        writeProfiles(profiles);
+        res.writeHead(201, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(saved));
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid request body." }));
+      }
+    });
+    return;
+  }
+
+  // DELETE /api/profiles/:id
+  const deleteMatch = req.url.match(/^\/api\/profiles\/([^/]+)$/);
+  if (req.method === "DELETE" && deleteMatch) {
+    const id = deleteMatch[1];
+    writeProfiles(readProfiles().filter((p) => p.id !== id));
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
     return;
   }
 

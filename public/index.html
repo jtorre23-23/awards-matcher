@@ -417,6 +417,95 @@
 
   .nominate-link:hover { text-decoration: underline; color: var(--cta-dark); }
 
+  .btn-teal {
+    background: var(--teal);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0,142,152,0.2);
+  }
+  .btn-teal:hover { background: var(--teal-dark); }
+  .btn-teal:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .saved-section {
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .saved-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 1rem;
+  }
+
+  .saved-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--teal);
+    border-radius: var(--radius);
+    padding: 0.85rem 1.1rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .saved-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .saved-org {
+    font-size: 13px;
+    color: var(--ink-3);
+    margin-top: 0.1rem;
+  }
+
+  .saved-type {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.2rem 0.55rem;
+    border-radius: 20px;
+    margin-top: 0.35rem;
+  }
+
+  .saved-type-bank { background: var(--accent-light); color: var(--teal); }
+  .saved-type-fintech { background: #fff0e6; color: var(--cta); }
+
+  .saved-actions { display: flex; gap: 1rem; align-items: center; flex-shrink: 0; }
+
+  .saved-load-btn {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--teal);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font);
+    padding: 0;
+    white-space: nowrap;
+  }
+  .saved-load-btn:hover { text-decoration: underline; }
+
+  .saved-delete-btn {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-3);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font);
+    padding: 0;
+  }
+  .saved-delete-btn:hover { color: #b91c1c; }
+
   @media (max-width: 600px) {
     .field-row { grid-template-columns: 1fr; }
     .award-body { grid-template-columns: 1fr; }
@@ -489,6 +578,11 @@
 
     <div id="form-error" class="error"></div>
     <button class="btn btn-primary" id="find-btn" onclick="submitProfile()">Find Awards →</button>
+
+    <div class="saved-section" id="saved-section" style="display:none">
+      <div class="saved-section-title">Saved profiles</div>
+      <div id="saved-list"></div>
+    </div>
   </div>
 
   <!-- RESULTS VIEW -->
@@ -498,7 +592,10 @@
         <h2 class="view-title" id="results-title">Matching awards</h2>
         <p class="view-sub" style="margin-bottom:0" id="results-sub"></p>
       </div>
-      <button class="btn btn-ghost" onclick="reset()" style="margin-top:4px">← New profile</button>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;margin-top:4px">
+        <button class="btn btn-ghost" onclick="reset()">← New profile</button>
+        <button class="btn btn-teal" id="save-btn" onclick="saveProfile()" style="display:none">Save this profile</button>
+      </div>
     </div>
 
     <div class="profile-pill" id="profile-pills"></div>
@@ -515,6 +612,8 @@
 
 <script>
   let activeTab = 'bank';
+  let currentProfile = null;
+  const savedProfilesMap = {};
 
   document.querySelectorAll('.tab').forEach(t => {
     t.addEventListener('click', () => {
@@ -571,6 +670,14 @@
     if (!p.company) return showErr('Please enter a ' + (activeTab === 'bank' ? 'bank' : 'company') + ' name.');
     if (!p.achievements) return showErr('Please describe some key achievements.');
 
+    currentProfile = p;
+
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.style.display = 'none';
+    saveBtn.textContent = 'Save this profile';
+    saveBtn.disabled = false;
+    saveBtn.style.background = '';
+
     setStep(2);
     showView('view-results');
     document.getElementById('loading').style.display = 'block';
@@ -599,6 +706,7 @@
       document.getElementById('results-sub').textContent = `${awards.length} awards found — sorted by match strength`;
       setStep(3);
       renderAwards(awards, p);
+      saveBtn.style.display = 'inline-flex';
     } catch (e) {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('awards-list').innerHTML =
@@ -641,6 +749,82 @@
     `).join('');
   }
 
+  async function saveProfile() {
+    const btn = document.getElementById('save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const res = await fetch('/api/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentProfile)
+      });
+      if (!res.ok) throw new Error();
+      btn.textContent = 'Saved ✓';
+      btn.style.background = 'var(--success)';
+      loadSavedProfiles();
+    } catch {
+      btn.textContent = 'Save this profile';
+      btn.disabled = false;
+    }
+  }
+
+  async function loadSavedProfiles() {
+    try {
+      const res = await fetch('/api/profiles');
+      const profiles = await res.json();
+      renderSavedProfiles(profiles);
+    } catch { }
+  }
+
+  function renderSavedProfiles(profiles) {
+    const section = document.getElementById('saved-section');
+    const list = document.getElementById('saved-list');
+    if (!profiles.length) { section.style.display = 'none'; return; }
+    profiles.forEach(p => savedProfilesMap[p.id] = p);
+    section.style.display = 'block';
+    list.innerHTML = profiles.map(p => `
+      <div class="saved-card">
+        <div>
+          <div class="saved-name">${p.name || p.company}</div>
+          <div class="saved-org">${[p.company, p.state].filter(Boolean).join(' · ')}</div>
+          <span class="saved-type ${p.type === 'bank' ? 'saved-type-bank' : 'saved-type-fintech'}">${p.type === 'bank' ? 'Bank Member' : 'Fintech Company'}</span>
+        </div>
+        <div class="saved-actions">
+          <button class="saved-load-btn" onclick="loadProfile('${p.id}')">Load & search →</button>
+          <button class="saved-delete-btn" onclick="deleteProfile('${p.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function deleteProfile(id) {
+    await fetch('/api/profiles/' + id, { method: 'DELETE' });
+    loadSavedProfiles();
+  }
+
+  function loadProfile(id) {
+    const p = savedProfilesMap[id];
+    if (!p) return;
+    activeTab = p.type;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === p.type));
+    document.querySelectorAll('.tab-panel').forEach(el => el.classList.toggle('active', el.id === 'panel-' + p.type));
+    if (p.type === 'bank') {
+      document.getElementById('b-name').value = p.name || '';
+      document.getElementById('b-title').value = p.title || '';
+      document.getElementById('b-bank').value = p.company || '';
+      document.getElementById('b-state').value = p.state || '';
+      document.getElementById('b-achievements').value = p.achievements || '';
+    } else {
+      document.getElementById('ft-name').value = p.name || '';
+      document.getElementById('ft-title').value = p.title || '';
+      document.getElementById('ft-company').value = p.company || '';
+      document.getElementById('ft-state').value = p.state || '';
+      document.getElementById('ft-achievements').value = p.achievements || '';
+    }
+    submitProfile();
+  }
+
   function draftNomination(award, profile) {
     const q = encodeURIComponent(`Draft a nomination for ${profile.name} for the "${award.award_name}" award by ${award.org}. Their key achievements: ${profile.achievements}. Nomination angle: ${award.nomination_angle}`);
     window.open(`https://claude.ai/new?q=${q}`, '_blank');
@@ -657,7 +841,10 @@
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'bank'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-bank'));
     document.getElementById('form-error').style.display = 'none';
+    document.getElementById('save-btn').style.display = 'none';
   }
+
+  loadSavedProfiles();
 </script>
 </body>
 </html>
