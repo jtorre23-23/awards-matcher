@@ -176,33 +176,31 @@
     line-height: 1.7;
   }
 
-  .tag-row {
+  .tab-bar {
     display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 2rem;
   }
 
-  .tag {
-    padding: 0.4rem 0.9rem;
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    font-size: 0.8rem;
-    color: var(--ink-2);
-    background: var(--surface);
-    cursor: pointer;
-    transition: all 0.12s;
-    user-select: none;
-    font-family: var(--font);
-  }
-
-  .tag:hover { border-color: var(--teal); color: var(--teal); }
-
-  .tag.on {
-    background: var(--accent-light);
-    border-color: var(--teal);
-    color: var(--teal);
+  .tab {
+    padding: 0.75rem 1.5rem;
+    font-size: 15px;
     font-weight: 600;
+    font-family: var(--font);
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    color: var(--ink-3);
+    transition: color 0.15s, border-color 0.15s;
   }
+
+  .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+  .tab:hover:not(.active) { color: var(--ink); }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 
   .btn {
     display: inline-flex;
@@ -447,75 +445,50 @@
 
   <!-- FORM VIEW -->
   <div class="view active" id="view-form">
-    <h2 class="view-title">Build a member profile</h2>
-    <p class="view-sub">Fill in what you know — the more detail on achievements, the sharper the award matches.</p>
+    <h2 class="view-title">Find matching awards</h2>
+    <p class="view-sub">Enter what you know — we'll match to real awards and nomination opportunities.</p>
 
-    <div class="form-section">
-      <span class="form-section-label">Basic info</span>
-      <div class="field-row">
-        <input type="text" id="f-name" placeholder="Full name" />
-        <input type="text" id="f-title" placeholder="Job title" />
-      </div>
-      <div class="field-row">
-        <input type="text" id="f-company" placeholder="Organization" />
-        <select id="f-industry">
-          <option value="">Industry</option>
-          <option>Banking & financial services</option>
-          <option>Community banking</option>
-          <option>Credit unions</option>
-          <option>Fintech</option>
-          <option>Healthcare</option>
-          <option>Technology</option>
-          <option>Nonprofits</option>
-          <option>Professional services</option>
-          <option>Education</option>
-          <option>Other</option>
-        </select>
-      </div>
-      <div class="field-row">
-        <select id="f-career">
-          <option value="">Career stage</option>
-          <option>Early career (0–5 yrs)</option>
-          <option>Mid-career (5–15 yrs)</option>
-          <option>Senior leader (15+ yrs)</option>
-          <option>Executive / C-suite</option>
-        </select>
-        <select id="f-geo">
-          <option value="">Geographic scope</option>
-          <option>Local / city</option>
-          <option>Regional / state</option>
-          <option>National</option>
-          <option>International</option>
-        </select>
+    <div class="tab-bar">
+      <button class="tab active" data-tab="bank">Bank Member</button>
+      <button class="tab" data-tab="fintech">Fintech Company</button>
+    </div>
+
+    <!-- Bank Member -->
+    <div class="tab-panel active" id="panel-bank">
+      <div class="form-section">
+        <div class="field-row">
+          <input type="text" id="b-name" placeholder="Member name" />
+          <input type="text" id="b-title" placeholder="Job title" />
+        </div>
+        <div class="field-row">
+          <input type="text" id="b-bank" placeholder="Bank name" />
+          <input type="text" id="b-state" placeholder="State" />
+        </div>
+        <div class="field-row single">
+          <textarea id="b-achievements" placeholder="What has this member accomplished? Even rough notes — e.g. led core conversion, launched a CDFI fund, grew deposits 30%, merged two banks"></textarea>
+        </div>
       </div>
     </div>
 
-    <div class="form-section">
-      <span class="form-section-label">Achievement themes</span>
-      <div class="tag-row" id="theme-tags">
-        <span class="tag" data-v="change management">Change management</span>
-        <span class="tag" data-v="digital transformation">Digital transformation</span>
-        <span class="tag" data-v="innovation">Innovation</span>
-        <span class="tag" data-v="leadership">Leadership</span>
-        <span class="tag" data-v="diversity & inclusion">Diversity & inclusion</span>
-        <span class="tag" data-v="community impact">Community impact</span>
-        <span class="tag" data-v="entrepreneurship">Entrepreneurship</span>
-        <span class="tag" data-v="sustainability">Sustainability</span>
-        <span class="tag" data-v="women in leadership">Women in leadership</span>
-        <span class="tag" data-v="emerging leader">Emerging leader</span>
-        <span class="tag" data-v="operational excellence">Operational excellence</span>
-      </div>
-    </div>
-
-    <div class="form-section">
-      <span class="form-section-label">Key achievements</span>
-      <div class="field-row single">
-        <textarea id="f-achievements" placeholder="Describe 2–3 notable achievements or initiatives with measurable outcomes. E.g. Led a 3-bank merger integration, launched digital onboarding that cut time-to-open by 60%, built a $40M innovation fund from scratch."></textarea>
+    <!-- Fintech Company -->
+    <div class="tab-panel" id="panel-fintech">
+      <div class="form-section">
+        <div class="field-row">
+          <input type="text" id="ft-name" placeholder="Founder or executive name" />
+          <input type="text" id="ft-title" placeholder="Title" />
+        </div>
+        <div class="field-row">
+          <input type="text" id="ft-company" placeholder="Company name" />
+          <input type="text" id="ft-state" placeholder="State" />
+        </div>
+        <div class="field-row single">
+          <textarea id="ft-achievements" placeholder="What has this company accomplished? E.g. reached $10M ARR, raised Series A, serves 50 community banks, launched embedded lending product"></textarea>
+        </div>
       </div>
     </div>
 
     <div id="form-error" class="error"></div>
-    <button class="btn btn-primary" id="find-btn" onclick="submitProfile()">Find matching awards →</button>
+    <button class="btn btn-primary" id="find-btn" onclick="submitProfile()">Find Awards →</button>
   </div>
 
   <!-- RESULTS VIEW -->
@@ -541,12 +514,15 @@
 </main>
 
 <script>
-  const themes = new Set();
+  let activeTab = 'bank';
 
-  document.querySelectorAll('.tag').forEach(t => {
+  document.querySelectorAll('.tab').forEach(t => {
     t.addEventListener('click', () => {
-      const v = t.dataset.v;
-      themes.has(v) ? (themes.delete(v), t.classList.remove('on')) : (themes.add(v), t.classList.add('on'));
+      activeTab = t.dataset.tab;
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('panel-' + activeTab).classList.add('active');
     });
   });
 
@@ -563,16 +539,25 @@
   }
 
   function getProfile() {
-    return {
-      name: document.getElementById('f-name').value.trim(),
-      title: document.getElementById('f-title').value.trim(),
-      company: document.getElementById('f-company').value.trim(),
-      industry: document.getElementById('f-industry').value,
-      career: document.getElementById('f-career').value,
-      geo: document.getElementById('f-geo').value,
-      themes: [...themes],
-      achievements: document.getElementById('f-achievements').value.trim(),
-    };
+    if (activeTab === 'bank') {
+      return {
+        type: 'bank',
+        name: document.getElementById('b-name').value.trim(),
+        title: document.getElementById('b-title').value.trim(),
+        company: document.getElementById('b-bank').value.trim(),
+        state: document.getElementById('b-state').value.trim(),
+        achievements: document.getElementById('b-achievements').value.trim(),
+      };
+    } else {
+      return {
+        type: 'fintech',
+        name: document.getElementById('ft-name').value.trim(),
+        title: document.getElementById('ft-title').value.trim(),
+        company: document.getElementById('ft-company').value.trim(),
+        state: document.getElementById('ft-state').value.trim(),
+        achievements: document.getElementById('ft-achievements').value.trim(),
+      };
+    }
   }
 
   async function submitProfile() {
@@ -580,22 +565,20 @@
     const errEl = document.getElementById('form-error');
     errEl.style.display = 'none';
 
-    if (!p.name) return showErr('Please enter a member name.');
-    if (!p.industry) return showErr('Please select an industry.');
-    if (p.themes.length === 0) return showErr('Select at least one achievement theme.');
-    if (!p.achievements) return showErr('Please describe at least one key achievement.');
-
     function showErr(msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
+
+    if (!p.name) return showErr('Please enter a name.');
+    if (!p.company) return showErr('Please enter a ' + (activeTab === 'bank' ? 'bank' : 'company') + ' name.');
+    if (!p.achievements) return showErr('Please describe some key achievements.');
 
     setStep(2);
     showView('view-results');
     document.getElementById('loading').style.display = 'block';
     document.getElementById('awards-list').innerHTML = '';
 
-    const pills = [p.name, p.title, p.industry, p.career, p.geo].filter(Boolean);
-    document.getElementById('profile-pills').innerHTML = pills.map(x => `<span class="pill">${x}</span>`).join('') +
-      p.themes.map(t => `<span class="pill" style="background:var(--accent-light);color:var(--teal)">${t}</span>`).join('');
-    document.getElementById('results-title').textContent = `Awards for ${p.name}`;
+    const pills = [p.name, p.title, p.company, p.state].filter(Boolean);
+    document.getElementById('profile-pills').innerHTML = pills.map(x => `<span class="pill">${x}</span>`).join('');
+    document.getElementById('results-title').textContent = `Awards for ${p.name || p.company}`;
     document.getElementById('results-sub').textContent = 'Reviewing profile and searching for matches…';
 
     try {
@@ -666,8 +649,13 @@
   function reset() {
     setStep(1);
     showView('view-form');
-    themes.clear();
-    document.querySelectorAll('.tag').forEach(t => t.classList.remove('on'));
+    ['b-name','b-title','b-bank','b-state','b-achievements',
+     'ft-name','ft-title','ft-company','ft-state','ft-achievements'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    activeTab = 'bank';
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'bank'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-bank'));
     document.getElementById('form-error').style.display = 'none';
   }
 </script>

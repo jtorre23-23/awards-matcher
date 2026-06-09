@@ -37,38 +37,63 @@ const server = http.createServer(async (req, res) => {
       try {
         const { profile } = JSON.parse(body);
 
-        const prompt = `You are an expert at matching professionals to awards and recognition programs.
+        const isBank = profile.type === 'bank';
 
-Given this member profile, identify 5–6 specific, real awards they should apply for. For each award include:
+        const prompt = isBank
+          ? `You are an expert at matching banking professionals to industry awards and recognition programs.
+
+Given this bank member profile, identify 5–6 specific, real awards they should apply for. Focus on banking leadership, community banking, financial services, credit union, and related professional recognition programs. Infer achievement themes automatically from their accomplishments — do not ask for themes.
+
+For each award include:
 - Award name
 - Sponsoring organization
 - Match strength: High or Medium
 - Why they're a strong fit (2–3 sentences, specific to their profile)
 - Recommended nomination angle (1–2 sentences on how to frame the story)
 - Typical deadline season (e.g. Q1, Q3, or "rolling")
-- The direct nomination or registration URL — the specific page where someone submits a nomination or registers, not the award's general homepage. For example: a nominations form page, an awards entry portal, or a "nominate someone" landing page. Only include a URL you are confident is real and correct. If you cannot identify the exact nomination page URL with confidence, return null for this field.
+- The direct nomination or registration URL
 
 Member profile:
 - Name: ${profile.name}
 - Title: ${profile.title}
-- Organization: ${profile.company}
-- Industry: ${profile.industry}
-- Career stage: ${profile.career}
-- Geographic scope: ${profile.geo}
-- Achievement themes: ${profile.themes.join(", ")}
-- Key achievements: ${profile.achievements}
+- Bank: ${profile.company}
+- State: ${profile.state}
+- Key achievements: ${profile.achievements}`
+          : `You are an expert at matching fintech companies and their leaders to startup, innovation, and technology awards.
+
+Given this fintech company profile, identify 5–6 specific, real awards they should apply for. Focus on startup awards, fintech innovation, technology leadership, entrepreneurship, and financial technology recognition programs. Infer achievement themes automatically from their accomplishments — do not ask for themes.
+
+For each award include:
+- Award name
+- Sponsoring organization
+- Match strength: High or Medium
+- Why they're a strong fit (2–3 sentences, specific to their profile)
+- Recommended nomination angle (1–2 sentences on how to frame the story)
+- Typical deadline season (e.g. Q1, Q3, or "rolling")
+- The direct nomination or registration URL
+
+Company profile:
+- Founder / Executive: ${profile.name}
+- Title: ${profile.title}
+- Company: ${profile.company}
+- State: ${profile.state}
+- Key achievements: ${profile.achievements}`;
+
+        const sharedInstructions = `
 
 Return ONLY a valid JSON array. No preamble, no markdown fences. Each object must have exactly these keys:
 award_name, org, match, fit_reason, nomination_angle, deadline_season, website_url, nomination_url
 
-website_url: the award's official information page URL. Never return null — if you are not certain of the exact award page, use the sponsoring organization's main website. If that is also uncertain, return a Google search URL in the format https://www.google.com/search?q=Award+Name+nomination where the query is the award name plus "nomination".
+website_url: the award's official information page URL. Never return null — if uncertain of the exact award page, use the sponsoring organization's main website. If that is also uncertain, return a Google search URL in the format https://www.google.com/search?q=Award+Name+nomination.
 nomination_url: the direct nomination/registration submission page URL, or null if uncertain.`;
+
+        const fullPrompt = prompt + sharedInstructions;
 
         const https = require("https");
         const payload = JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1500,
-          messages: [{ role: "user", content: prompt }],
+          messages: [{ role: "user", content: fullPrompt }],
         });
 
         const options = {
