@@ -88,9 +88,9 @@ const server = http.createServer(async (req, res) => {
         const isBank = profile.type === 'bank';
 
         const prompt = isBank
-          ? `You are an expert at matching banking professionals to industry awards and recognition programs.
+          ? `You are an expert at matching banking professionals to prestigious industry awards and recognition programs.
 
-Given this bank member profile, identify 5–6 specific, real awards they should apply for. Focus on banking leadership, community banking, financial services, credit union, and related professional recognition programs. Infer achievement themes automatically from their accomplishments — do not ask for themes.
+Given this bank member profile, return only awards where there is a genuine, strong fit based on the member's profile and achievements. Focus on nationally recognized, prestigious awards in banking leadership, community banking, and financial services. Quality over quantity — 3 great matches is better than 8 mediocre ones. Never pad results with weak matches just to fill a list. Only include an award if you are confident it is real, currently active, and the member has a credible shot at winning or being nominated. Infer achievement themes automatically from their accomplishments.
 
 For each award include:
 - Award name
@@ -109,9 +109,9 @@ Member profile:
 ${profile.state ? `- Location: ${profile.state}\n` : ''}- Key achievements: ${profile.achievements}
 
 If location is provided, include relevant local and regional awards alongside national ones. If no location is provided, focus entirely on national and industry-wide awards.`
-          : `You are an expert at matching fintech companies and their leaders to startup, innovation, and technology awards.
+          : `You are an expert at matching fintech companies and their leaders to prestigious startup, innovation, and technology awards.
 
-Given this fintech company profile, identify 5–6 specific, real awards they should apply for. Focus on startup awards, fintech innovation, technology leadership, entrepreneurship, and financial technology recognition programs. Infer achievement themes automatically from their accomplishments — do not ask for themes.
+Given this fintech company profile, return only awards where there is a genuine, strong fit based on the company's profile and achievements. Focus on nationally recognized, prestigious awards in fintech innovation, startup excellence, and technology leadership. Quality over quantity — 3 great matches is better than 8 mediocre ones. Never pad results with weak matches just to fill a list. Only include an award if you are confident it is real, currently active, and the company has a credible shot at winning or being nominated. Infer achievement themes automatically from their accomplishments.
 
 For each award include:
 - Award name
