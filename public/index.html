@@ -674,6 +674,7 @@
       <button class="tab active" data-tab="bank">Bank Member</button>
       <button class="tab" data-tab="fintech">Fintech Company</button>
       <button class="tab" data-tab="scan">Scan transcript</button>
+      <button class="tab" data-tab="automation">Automation</button>
     </div>
 
     <!-- Bank Member -->
@@ -690,6 +691,9 @@
         <div class="field-row">
           <input type="text" id="b-bank" placeholder="Bank name" />
           <input type="text" id="b-state" placeholder="Location (optional) — e.g. Chicago IL, Southeast, National" />
+        </div>
+        <div class="field-row">
+          <input type="text" id="b-portfolio" placeholder="Portfolio / ventures (optional) — e.g. investee companies or partner projects" />
         </div>
         <div class="field-row single">
           <textarea id="b-achievements" placeholder="What has this member accomplished? Even rough notes — e.g. led core conversion, launched a CDFI fund, grew deposits 30%, merged two banks"></textarea>
@@ -708,6 +712,9 @@
           <input type="text" id="ft-company" placeholder="Company name" />
           <input type="text" id="ft-state" placeholder="Location (optional) — e.g. Chicago IL, Southeast, National" />
         </div>
+        <div class="field-row">
+          <input type="text" id="ft-portfolio" placeholder="Portfolio companies / ventures (optional)" />
+        </div>
         <div class="field-row single">
           <textarea id="ft-achievements" placeholder="What has this company accomplished? E.g. reached $10M ARR, raised Series A, serves 50 community banks, launched embedded lending product"></textarea>
         </div>
@@ -723,6 +730,24 @@
       </div>
       <div id="scan-error" class="error"></div>
       <button class="btn btn-primary" onclick="scanTranscript()">Scan for opportunities →</button>
+    </div>
+
+    <!-- Automation -->
+    <div class="tab-panel" id="panel-automation">
+      <div class="form-section">
+        <p style="margin-bottom:1rem;color:var(--ink-2)">Run the monthly awards pipeline to pull upcoming awards from Notion, match against saved member profiles and Zoho CRM accounts, draft 400-word nominations, and deliver a color-coded review page to Notion.</p>
+        <div class="field-row">
+          <button class="btn btn-primary" id="run-automation-btn" onclick="runAutomationNow()">Run monthly automation</button>
+          <button class="btn btn-ghost" onclick="refreshAutomation()">Refresh status</button>
+        </div>
+        <div class="field-row single" style="margin-top:1rem">
+          <div id="automation-status" style="font-size:14px;color:var(--ink-3);"></div>
+        </div>
+      </div>
+      <div class="saved-section" id="automation-queue-section" style="display:none">
+        <div class="saved-section-title">Pending automation review items</div>
+        <div id="automation-queue"></div>
+      </div>
     </div>
 
     <div id="main-form-actions">
@@ -791,8 +816,9 @@
       document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
       t.classList.add('active');
       document.getElementById('panel-' + activeTab).classList.add('active');
-      // show/hide the main form submit button when switching to/from scan tab
-      document.getElementById('main-form-actions').style.display = activeTab === 'scan' ? 'none' : '';
+      const hideActions = activeTab === 'scan' || activeTab === 'automation';
+      document.getElementById('main-form-actions').style.display = hideActions ? 'none' : '';
+      if (activeTab === 'automation') refreshAutomation();
     });
   });
 
@@ -871,6 +897,76 @@
     document.getElementById(id).classList.add('active');
   }
 
+  async function refreshAutomation() {
+    const status = document.getElementById('automation-status');
+    const section = document.getElementById('automation-queue-section');
+    const queue = document.getElementById('automation-queue');
+    status.textContent = 'Loading automation status…';
+    section.style.display = 'none';
+    queue.innerHTML = '';
+
+    try {
+      const [statusRes, queueRes] = await Promise.all([
+        fetch('/api/automation/status'),
+        fetch('/api/review-items'),
+      ]);
+      const statusData = await statusRes.json();
+      const queueData = await queueRes.json();
+      const notionLink = statusData.lastNotionUrl
+        ? ` · <a href="${statusData.lastNotionUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--teal);font-weight:600">View in Notion →</a>`
+        : '';
+      status.innerHTML = `Last run: ${statusData.lastRun || 'never'} · Next run: ${statusData.nextRun} · ${statusData.queuedCount} pending items${notionLink}`;
+      if (Array.isArray(queueData) && queueData.length) {
+        section.style.display = 'block';
+        renderAutomationQueue(queueData);
+      } else {
+        queue.innerHTML = '<div style="color:var(--ink-3);font-size:14px;padding:1rem 0">No automation items pending review.</div>';
+      }
+    } catch (e) {
+      status.textContent = `Automation status unavailable. ${e.message}`;
+    }
+  }
+
+  async function runAutomationNow() {
+    const btn = document.getElementById('run-automation-btn');
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Running…';
+    try {
+      const res = await fetch('/api/automation/run', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      btn.textContent = `Added ${data.added} items`;
+      refreshAutomation();
+    } catch (e) {
+      btn.textContent = originalText;
+      alert('Automation failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function renderAutomationQueue(items) {
+    document.getElementById('automation-queue').innerHTML = items.map(item => {
+      const profileName = item.profile.name || item.profile.company || 'Unknown';
+      const awardLink = item.award.nomination_url ? `<a class="nominate-link" href="${item.award.nomination_url}" target="_blank" rel="noopener noreferrer">Open nomination →</a>` : '';
+      const notionItemLink = item.notionPageUrl ? `<a class="award-link" href="${item.notionPageUrl}" target="_blank" rel="noopener noreferrer">View in Notion →</a>` : '';
+      return `
+        <div class="saved-card">
+          <div>
+            <div class="saved-name">${profileName}</div>
+            <div class="saved-org">${item.award.award_name} · ${item.award.org} · ${item.match} match</div>
+            <div style="margin-top:0.5rem;font-size:14px;color:var(--ink-2);line-height:1.6">${item.draft_summary}</div>
+          </div>
+          <div class="saved-actions">
+            ${awardLink}
+            ${notionItemLink}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
   function getProfile() {
     if (activeTab === 'bank') {
       return {
@@ -879,6 +975,7 @@
         title: document.getElementById('b-title').value.trim(),
         company: document.getElementById('b-bank').value.trim(),
         state: document.getElementById('b-state').value.trim(),
+        portfolio: document.getElementById('b-portfolio').value.trim(),
         achievements: document.getElementById('b-achievements').value.trim(),
       };
     } else {
@@ -888,6 +985,7 @@
         title: document.getElementById('ft-title').value.trim(),
         company: document.getElementById('ft-company').value.trim(),
         state: document.getElementById('ft-state').value.trim(),
+        portfolio: document.getElementById('ft-portfolio').value.trim(),
         achievements: document.getElementById('ft-achievements').value.trim(),
       };
     }
@@ -917,7 +1015,7 @@
     document.getElementById('loading').style.display = 'block';
     document.getElementById('awards-list').innerHTML = '';
 
-    const pills = [p.name, p.title, p.company, p.state].filter(Boolean);
+    const pills = [p.name, p.title, p.company, p.state, p.portfolio].filter(Boolean);
     document.getElementById('profile-pills').innerHTML = pills.map(x => `<span class="pill">${x}</span>`).join('');
     document.getElementById('results-title').textContent = `Awards for ${p.name || p.company}`;
     document.getElementById('results-sub').textContent = 'Reviewing profile and searching for matches…';
@@ -1112,6 +1210,76 @@
     document.getElementById('main-form-actions').style.display = 'none';
   }
 
+  async function refreshAutomation() {
+    const status = document.getElementById('automation-status');
+    const section = document.getElementById('automation-queue-section');
+    const queue = document.getElementById('automation-queue');
+    status.textContent = 'Loading automation status…';
+    section.style.display = 'none';
+    queue.innerHTML = '';
+
+    try {
+      const [statusRes, queueRes] = await Promise.all([
+        fetch('/api/automation/status'),
+        fetch('/api/review-items'),
+      ]);
+      const statusData = await statusRes.json();
+      const queueData = await queueRes.json();
+      const notionLink = statusData.lastNotionUrl
+        ? ` · <a href="${statusData.lastNotionUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--teal);font-weight:600">View in Notion →</a>`
+        : '';
+      status.innerHTML = `Last run: ${statusData.lastRun || 'never'} · Next run: ${statusData.nextRun} · ${statusData.queuedCount} pending items${notionLink}`;
+      if (Array.isArray(queueData) && queueData.length) {
+        section.style.display = 'block';
+        renderAutomationQueue(queueData);
+      } else {
+        queue.innerHTML = '<div style="color:var(--ink-3);font-size:14px;padding:1rem 0">No automation items pending review.</div>';
+      }
+    } catch (e) {
+      status.textContent = `Automation status unavailable. ${e.message}`;
+    }
+  }
+
+  async function runAutomationNow() {
+    const btn = document.getElementById('run-automation-btn');
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Running…';
+    try {
+      const res = await fetch('/api/automation/run', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      btn.textContent = `Added ${data.added} items`;
+      refreshAutomation();
+    } catch (e) {
+      btn.textContent = originalText;
+      alert('Automation failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function renderAutomationQueue(items) {
+    document.getElementById('automation-queue').innerHTML = items.map(item => {
+      const profileName = item.profile.name || item.profile.company || 'Unknown';
+      const awardLink = item.award.nomination_url ? `<a class="nominate-link" href="${item.award.nomination_url}" target="_blank" rel="noopener noreferrer">Open nomination →</a>` : '';
+      const notionItemLink = item.notionPageUrl ? `<a class="award-link" href="${item.notionPageUrl}" target="_blank" rel="noopener noreferrer">View in Notion →</a>` : '';
+      return `
+        <div class="saved-card">
+          <div>
+            <div class="saved-name">${profileName}</div>
+            <div class="saved-org">${item.award.award_name} · ${item.award.org} · ${item.match} match</div>
+            <div style="margin-top:0.5rem;font-size:14px;color:var(--ink-2);line-height:1.6">${item.draft_summary}</div>
+          </div>
+          <div class="saved-actions">
+            ${awardLink}
+            ${notionItemLink}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
   // --- Profile save/load ---
 
   async function saveProfile() {
@@ -1208,7 +1376,8 @@ NOMINEE PROFILE
 Name: ${profile.name}
 Title: ${profile.title || 'Not specified'}
 ${profile.type === 'bank' ? 'Bank' : 'Company'}: ${profile.company}${location}
-Background: ${typeLabel}
+${profile.portfolio ? `Portfolio/ventures: ${profile.portfolio}
+` : ''}Background: ${typeLabel}
 Key achievements: ${profile.achievements}
 
 LETTER REQUIREMENTS
